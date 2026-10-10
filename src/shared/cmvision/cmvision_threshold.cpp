@@ -177,7 +177,7 @@ bool CMVisionThreshold::thresholdImageRGB(Image<raw8> * target, const ImageInter
 
 #pragma GCC unroll 16
     for(int j=0; j<16; j++) {
-      target_pointer[i+j] = mask_pointer[i] & LUT[idx[j]];
+      target_pointer[i+j] = mask_pointer[i+j] & LUT[idx[j]];
     }
   }
 #else
