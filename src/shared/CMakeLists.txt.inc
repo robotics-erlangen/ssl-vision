@@ -112,6 +112,7 @@ set (SHARED_HEADERS
 	${shared_dir}/cmpattern/cmpattern_teamdetector.h
 
 	${shared_dir}/util/field.h
+	${shared_dir}/util/lut3d.h
 
 	${shared_dir}/vartypes/VarNotifier.h
 

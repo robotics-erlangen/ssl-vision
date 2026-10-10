@@ -204,7 +204,6 @@ qt5_wrap_cpp (MOC_SRCS
 	src/app/gui/videowidget.h
 	src/app/gui/jog_dial.h
 
-	src/shared/util/lut3d.h
 	src/shared/util/convex_hull_image_mask.h
 
 	src/app/plugins/plugin_dvr.h
@@ -294,3 +293,9 @@ add_executable(graphicalClient ${GCLIENT_MOC_SRCS}
   src/graphicalClient/gltext.cpp
 )
 target_link_libraries(graphicalClient ${libs} Qt5::Widgets Qt5::OpenGL)
+
+## benchmark of RGB color thresholding (not built by default): make -C build benchmark_threshold_rgb
+add_executable(benchmark_threshold_rgb EXCLUDE_FROM_ALL
+  src/benchmark/benchmark_threshold_rgb.cpp
+)
+target_link_libraries(benchmark_threshold_rgb ${libs} Qt5::Core)
