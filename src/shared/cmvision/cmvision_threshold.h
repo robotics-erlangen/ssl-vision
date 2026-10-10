@@ -40,7 +40,7 @@ public:
 
   static bool thresholdImageYUV422_UYVY(Image<raw8> * target, const RawImage * source, YUVLUT * lut, const ImageInterface* mask);
   static bool thresholdImageYUV444(Image<raw8> * target, const ImageInterface * source, YUVLUT * lut, const ImageInterface* mask);
-  static bool thresholdImageRGB(Image<raw8> * target, const ImageInterface * source, RGBLUT * lut, const ImageInterface* mask);
+  static bool thresholdImageRGB(Image<raw8> * target, const ImageInterface * source, YUVLUT * lut, const ImageInterface* mask);
 };
 
 #endif

@@ -26,12 +26,7 @@ static void thresholdImage(RawImage *imagePartIn, Image<raw8> *imagePartOut, YUV
   } else if (imagePartIn->getColorFormat() == COLOR_YUV444) {
     CMVisionThreshold::thresholdImageYUV444(imagePartOut, imagePartIn, lut, mask);
   } else if (imagePartIn->getColorFormat() == COLOR_RGB8) {
-    auto *rgblut = (RGBLUT *) lut->getDerivedLUT(CSPACE_RGB);
-    if (rgblut == nullptr) {
-      printf("WARNING: No RGB LUT has been defined. You need to create a derived RGB LUT by calling e.g. \"lut_yuv->addDerivedLUT(new RGBLUT(5,5,5,\"\"))\" in the stack constructor!\n");
-    } else {
-      CMVisionThreshold::thresholdImageRGB(imagePartOut, imagePartIn, rgblut, mask);
-    }
+    CMVisionThreshold::thresholdImageRGB(imagePartOut, imagePartIn, lut, mask);
   } else {
     fprintf(stderr, "ColorThresholding needs YUV422, YUV444, or RGB8 as input image, but found: %s\n",
             Colors::colorFormatToString(imagePartIn->getColorFormat()).c_str());

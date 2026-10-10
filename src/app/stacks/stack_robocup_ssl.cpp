@@ -48,7 +48,6 @@ StackRoboCupSSL::StackRoboCupSSL(
   (void)_fb;
   lut_yuv = new YUVLUT(4,6,6,cam_settings_filename + "-lut-yuv.xml");
   lut_yuv->loadRoboCupChannels(LUTChannelMode_Numeric);
-  lut_yuv->addDerivedLUT(new RGBLUT(5,5,5,""));
   settings->addChild(lut_yuv->getSettings());
 
   camera_parameters = new CameraParameters(_camera_id, global_field);

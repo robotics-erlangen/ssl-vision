@@ -106,15 +106,17 @@ bool CMVisionThreshold::thresholdImageYUV444(Image<raw8> * target, const ImageIn
 
 
 
-bool CMVisionThreshold::thresholdImageRGB(Image<raw8> * target, const ImageInterface * source, RGBLUT * lut, const ImageInterface* mask) {
+bool CMVisionThreshold::thresholdImageRGB(Image<raw8> * target, const ImageInterface * source, YUVLUT * lut, const ImageInterface* mask) {
+  // Each pixel is converted to YUV exactly as the LUT GUI does (Conversions::rgb2yuv) and looked up in the YUV LUT,
+  // so the classification matches what is shown while calibrating.
   if (source->getColorFormat()!=COLOR_RGB8) {
     fprintf(stderr,"CMVision RGB thresholding assumes RGB8 as input, but found %s\n", Colors::colorFormatToString(source->getColorFormat()).c_str());
     return false;
   }
 
-  register lut_mask_t * LUT = lut->getTable();
+  lut_mask_t * LUT = lut->getTable();
   int source_size    = source->getNumPixels();
-  const rgb * source_pointer = (const rgb*)(source->getData());
+  const uint8_t * source_pixel = source->getData();
   auto * target_pointer = (uint8_t*) target->getPixelData();
   auto * mask_pointer = mask->getData();
 
@@ -129,6 +131,7 @@ bool CMVisionThreshold::thresholdImageRGB(Image<raw8> * target, const ImageInter
   int Z_AND_Y_BITS=lut->Z_AND_Y_BITS;
   int Z_BITS = lut->Z_BITS;
 
+  int i=0;
 #ifdef __AVX2__
   // unpacking from: https://docs.google.com/presentation/d/1I0-SiHid1hTsv7tjLST2dYW5YF5AJVfs9l4Rg9rvz48/edit#slide=id.g1eefe20b_0_125
   __m128i ssse3_red_indeces_0 = _mm_set_epi8(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 15, 12, 9, 6, 3, 0);
@@ -141,11 +144,32 @@ bool CMVisionThreshold::thresholdImageRGB(Image<raw8> * target, const ImageInter
   __m128i ssse3_blue_indeces_1 = _mm_set_epi8(-1, -1, -1, -1, -1, -1, 13, 10, 7, 4, 1, -1, -1, -1, -1, -1);
   __m128i ssse3_blue_indeces_2 = _mm_set_epi8(15, 12, 9, 6, 3, 0, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1);
 
-  uint16_t idx[16];
-  const rgb* p=&source_pointer[0];
-  const uint8_t* source_pixel = (const uint8_t*)p;
+  // rgb2yuv coefficients as 16-bit pairs for madd: (r,g) pairs and (b,0) pairs
+  const __m256i y_rg = _mm256_set1_epi32((601 << 16) | 306);
+  const __m256i y_b  = _mm256_set1_epi32(117);
+  const __m256i u_rg = _mm256_set1_epi32((int)(((uint32_t)(uint16_t)-340 << 16) | (uint16_t)-172));
+  const __m256i u_b  = _mm256_set1_epi32(512);
+  const __m256i v_rg = _mm256_set1_epi32((int)(((uint32_t)(uint16_t)-429 << 16) | 512));
+  const __m256i v_b  = _mm256_set1_epi32((uint16_t)-83);
+  const __m256i c128 = _mm256_set1_epi32(128);
+  const __m256i c255 = _mm256_set1_epi32(255);
+  const __m256i zero = _mm256_setzero_si256();
 
-  for (int i=0; i<source_size; i+=16) {
+  // 8 pixels as (r,g) and (b,0) pairs -> 8 32-bit LUT indices
+  auto lut_index = [&](__m256i rg, __m256i b0) {
+    __m256i y = _mm256_srai_epi32(_mm256_add_epi32(_mm256_madd_epi16(rg, y_rg), _mm256_madd_epi16(b0, y_b)), 10);
+    __m256i u = _mm256_add_epi32(_mm256_srai_epi32(_mm256_add_epi32(_mm256_madd_epi16(rg, u_rg), _mm256_madd_epi16(b0, u_b)), 10), c128);
+    __m256i v = _mm256_add_epi32(_mm256_srai_epi32(_mm256_add_epi32(_mm256_madd_epi16(rg, v_rg), _mm256_madd_epi16(b0, v_b)), 10), c128);
+    y = _mm256_min_epi32(_mm256_max_epi32(y, zero), c255);
+    u = _mm256_min_epi32(_mm256_max_epi32(u, zero), c255);
+    v = _mm256_min_epi32(_mm256_max_epi32(v, zero), c255);
+    return _mm256_or_si256(_mm256_slli_epi32(_mm256_srli_epi32(y, X_SHIFT), Z_AND_Y_BITS),
+                           _mm256_or_si256(_mm256_slli_epi32(_mm256_srli_epi32(u, Y_SHIFT), Z_BITS), _mm256_srli_epi32(v, Z_SHIFT)));
+  };
+
+  alignas(32) uint16_t idx[16];
+
+  for (; i+16<=source_size; i+=16) {
 
     // crazy RGB unpacking
     const __m128i chunk0 = _mm_loadu_si128((const __m128i*)(source_pixel));
@@ -162,31 +186,27 @@ bool CMVisionThreshold::thresholdImageRGB(Image<raw8> * target, const ImageInter
 
     // widen pixel values to 16bit
     __m256i r = _mm256_cvtepu8_epi16(red);
-    __m256i b = _mm256_cvtepu8_epi16(blue);
     __m256i g = _mm256_cvtepu8_epi16(green);
+    __m256i b = _mm256_cvtepu8_epi16(blue);
 
-    // do the original shifts on 16 values in parallel
-    __m256i rs = _mm256_slli_epi16(_mm256_srli_epi16(r, X_SHIFT), Z_AND_Y_BITS);
-    __m256i gs = _mm256_slli_epi16(_mm256_srli_epi16(g, Y_SHIFT), Z_BITS);
-    __m256i bs = _mm256_srli_epi16(b, Z_SHIFT);
-
-    // construct LUT indices (ORing)
-    __m256i result = _mm256_or_si256(rs, _mm256_or_si256(gs, bs));
-
-    _mm256_storeu_si256((__m256i*)idx, result);
+    // unpack works per 128-bit lane: lo holds pixels 0-3 and 8-11, hi holds 4-7 and 12-15.
+    // packus (also per lane) restores the original order.
+    __m256i lo = lut_index(_mm256_unpacklo_epi16(r, g), _mm256_unpacklo_epi16(b, zero));
+    __m256i hi = lut_index(_mm256_unpackhi_epi16(r, g), _mm256_unpackhi_epi16(b, zero));
+    _mm256_store_si256((__m256i*)idx, _mm256_packus_epi32(lo, hi));
 
 #pragma GCC unroll 16
     for(int j=0; j<16; j++) {
       target_pointer[i+j] = mask_pointer[i+j] & LUT[idx[j]];
     }
   }
-#else
-  #pragma GCC unroll 4
-  for (int i=0; i<source_size; i++) {
-    rgb p=source_pointer[i];
-    target_pointer[i] = mask_pointer[i] & LUT[(((p.r >> X_SHIFT) << Z_AND_Y_BITS) | ((p.g >> Y_SHIFT) << Z_BITS) | (p.b >> Z_SHIFT))];
-  }
 #endif
+  // remaining pixels (all pixels without AVX2)
+  for (; i<source_size; i++, source_pixel+=3) {
+    int y, u, v;
+    Conversions::rgb2yuv(source_pixel[0], source_pixel[1], source_pixel[2], y, u, v);
+    target_pointer[i] = mask_pointer[i] & LUT[((y >> X_SHIFT) << Z_AND_Y_BITS) | ((u >> Y_SHIFT) << Z_BITS) | (v >> Z_SHIFT)];
+  }
 
   return true;
 }
