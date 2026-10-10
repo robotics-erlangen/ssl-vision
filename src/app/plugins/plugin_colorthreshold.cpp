@@ -121,6 +121,9 @@ void PluginColorThreshold::clearWorkers() {
 
 ProcessResult PluginColorThreshold::process(FrameData * data, RenderOptions * options) {
   _image_mask.lock();
+  // Lock the LUT once for the whole frame instead of per worker, so the workers can read it in parallel
+  // while the GUI is kept from changing it mid-frame.
+  lut->lock();
   (void)options;
 
   Image<raw8> * img_thresholded;
@@ -155,6 +158,7 @@ ProcessResult PluginColorThreshold::process(FrameData * data, RenderOptions * op
     }
   }
 
+  lut->unlock();
   _image_mask.unlock();
   return ProcessingOk;
 }

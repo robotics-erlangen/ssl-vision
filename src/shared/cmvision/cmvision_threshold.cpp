@@ -52,7 +52,6 @@ bool CMVisionThreshold::thresholdImageYUV422_UYVY(Image<raw8> * target, const Ra
     return false;
   }
 
-  lut->lock();
   int X_SHIFT=lut->X_SHIFT;
   int Y_SHIFT=lut->Y_SHIFT;
   int Z_SHIFT=lut->Z_SHIFT;
@@ -66,7 +65,6 @@ bool CMVisionThreshold::thresholdImageYUV422_UYVY(Image<raw8> * target, const Ra
     target_pointer[i] =  mask_pointer[i] & LUT[(((p.y1 >> X_SHIFT) << Z_AND_Y_BITS) | B | C)];
     target_pointer[i+1] =  mask_pointer[i+1] & LUT[(((p.y2 >> X_SHIFT) << Z_AND_Y_BITS) | B | C)];
   }
-  lut->unlock();
   return true;
 }
 
@@ -88,7 +86,6 @@ bool CMVisionThreshold::thresholdImageYUV444(Image<raw8> * target, const ImageIn
     return false;
   }
 
-  lut->lock();
   int X_SHIFT=lut->X_SHIFT;
   int Y_SHIFT=lut->Y_SHIFT;
   int Z_SHIFT=lut->Z_SHIFT;
@@ -99,7 +96,6 @@ bool CMVisionThreshold::thresholdImageYUV444(Image<raw8> * target, const ImageIn
     p=source_pointer[i];
     target_pointer[i] =  mask_pointer[i] & LUT[(((p.y >> X_SHIFT) << Z_AND_Y_BITS) | ((p.u >> Y_SHIFT) << Z_BITS) | (p.v >> Z_SHIFT))];
   }
-  lut->unlock();
 
   return true;
 }

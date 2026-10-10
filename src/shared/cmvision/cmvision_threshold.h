@@ -38,6 +38,8 @@ public:
 
     ~CMVisionThreshold();
 
+  // The caller has to hold lut->lock() while thresholding (the functions only read the LUT,
+  // so multiple threads can threshold parts of an image in parallel under one lock).
   static bool thresholdImageYUV422_UYVY(Image<raw8> * target, const RawImage * source, YUVLUT * lut, const ImageInterface* mask);
   static bool thresholdImageYUV444(Image<raw8> * target, const ImageInterface * source, YUVLUT * lut, const ImageInterface* mask);
   static bool thresholdImageRGB(Image<raw8> * target, const ImageInterface * source, YUVLUT * lut, const ImageInterface* mask);
