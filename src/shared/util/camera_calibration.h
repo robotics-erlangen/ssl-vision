@@ -28,6 +28,7 @@
 
 #include <Eigen/Core>
 #include <opencv2/opencv.hpp>
+#include <opencv2/calib3d.hpp>
 
 #include "camera_parameters.h"
 #include "field.h"

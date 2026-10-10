@@ -19,19 +19,29 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR}/cmake)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_AUTOMOC ON)
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 
 # Find third-party libraries
 find_package(OpenGL REQUIRED)
 find_package(Threads REQUIRED)
-find_package(Protobuf REQUIRED)
+# Prefer protobuf's own config package: its target also links the abseil libraries newer protobuf versions require
+find_package(Protobuf CONFIG QUIET)
+if(NOT Protobuf_FOUND)
+	find_package(Protobuf REQUIRED)
+endif()
 find_package(PkgConfig REQUIRED)
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 find_package(Qt5Core REQUIRED)
 find_package(Qt5Widgets REQUIRED)
 find_package(Qt5OpenGL REQUIRED)
 # Note: Bluefox SDK is not compatible with some components of OpenCV. Take care when enabling more.
-find_package(OpenCV REQUIRED COMPONENTS core imgproc imgcodecs videoio calib3d)
+find_package(OpenCV REQUIRED COMPONENTS core)
+# OpenCV 5 split calib3d into geometry, calib and stereo
+if(OpenCV_VERSION VERSION_LESS 5)
+	find_package(OpenCV REQUIRED COMPONENTS core imgproc imgcodecs videoio calib3d)
+else()
+	find_package(OpenCV REQUIRED COMPONENTS core imgproc imgcodecs videoio geometry calib)
+endif()
 
 include(src/shared/CMakeLists.txt.inc)
 
@@ -256,7 +266,7 @@ set (libs
   ${CMAKE_THREAD_LIBS_INIT}
   ${OPENGL_gl_LIBRARY}
   ${OPENGL_glu_LIBRARY}
-  ${PROTOBUF_LIBRARIES}
+  protobuf::libprotobuf
   ${DC1394_LIBRARIES}
   ${mvIMPACT_LIBS}
   ${PYLON_LIBRARIES}
